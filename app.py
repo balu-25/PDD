@@ -17,14 +17,14 @@ uploaded_file = st.file_uploader("Upload a plant leaf image", type=["jpg", "jpeg
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
-    st.image(image, caption="Uploaded Image", use_column_width=True)
+    st.image(image, caption="Uploaded Image", use_container_width=True)
 
     # Run prediction
     results = model.predict(image, imgsz=320, conf=0.25, device="cpu")
 
     # Show annotated image
     annotated = results[0].plot()  # numpy array (BGR)
-    st.image(annotated, caption="Predictions", use_column_width=True)
+    st.image(annotated, caption="Predictions", use_container_width=True)
 
     # Show detected classes
     detections = []
