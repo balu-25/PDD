@@ -3,5 +3,5 @@ services:
     name: plant-disease-detection
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    startCommand: streamlit run app.py --server.port 10000 --server.address 0.0.0.0
     plan: free

@@ -1,69 +1,41 @@
-from flask import Flask, request, jsonify, render_template
+import streamlit as st
 from ultralytics import YOLO
-import os
 from PIL import Image
-import cv2
 
-app = Flask(__name__)
+# Load YOLOv8 model only once
+@st.cache_resource
+def load_model():
+    model = YOLO("best.pt")  # ensure best.pt is in project root
+    model.to("cpu")
+    return model
 
-# Load YOLOv8n model
-model = YOLO("best.pt")  # keep your trained model here
+model = load_model()
 
-# Folders
-UPLOAD_FOLDER = "uploads"
-RESULT_FOLDER = "static/results"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(RESULT_FOLDER, exist_ok=True)
+st.title("🌱 Plant Disease Detection (YOLOv8)")
 
-@app.route("/")
-def home():
-    return render_template("index.html")
+uploaded_file = st.file_uploader("Upload a plant leaf image", type=["jpg", "jpeg", "png"])
 
-@app.route("/predict", methods=["POST"])
-def predict():
-    try:
-        if "image" not in request.files:
-            return jsonify({"error": "No image uploaded"}), 400
+if uploaded_file is not None:
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Uploaded Image", use_column_width=True)
 
-        image = request.files["image"]
-        image_path = os.path.join(UPLOAD_FOLDER, image.filename)
-        image.save(image_path)
+    # Run prediction
+    results = model.predict(image, imgsz=320, conf=0.25, device="cpu")
 
-        # Run YOLOv8 prediction (optimized for Render Free Tier)
-        results = model.predict(
-            source=image_path,
-            conf=0.25,
-            iou=0.45,
-            imgsz=320,   # reduce input size
-            device="cpu",# run on CPU
-            batch=1
-        )
+    # Show annotated image
+    annotated = results[0].plot()  # numpy array (BGR)
+    st.image(annotated, caption="Predictions", use_column_width=True)
 
-        # Save annotated result
-        annotated_image = results[0].plot()
-        annotated_image_rgb = cv2.cvtColor(annotated_image, cv2.COLOR_BGR2RGB)
-        output_file_path = os.path.join(RESULT_FOLDER, "predicted_" + image.filename)
-        Image.fromarray(annotated_image_rgb).save(output_file_path)
+    # Show detected classes
+    detections = []
+    for r in results:
+        for box in r.boxes:
+            cls_id = int(box.cls[0])
+            label = model.names[cls_id]
+            conf = float(box.conf[0])
+            detections.append(f"{label} ({conf:.2f})")
 
-        # Get best detection
-        top_detection = None
-        top_conf = 0.0
-        for r in results:
-            for box in r.boxes:
-                cls_id = int(box.cls[0])
-                label = model.names[cls_id]
-                conf = float(box.conf[0])
-                if conf > top_conf:
-                    top_detection = {"label": label, "confidence": round(conf, 2)}
-                    top_conf = conf
-
-        return jsonify({
-            "prediction": top_detection,
-            "image_url": "/" + output_file_path.replace("\\", "/")
-        })
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    if detections:
+        st.subheader("Detections:")
+        for d in detections:
+            st.write("- " + d)
