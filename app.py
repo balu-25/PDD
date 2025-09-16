@@ -10,7 +10,11 @@ def load_model():
     return model
 
 model = load_model()
-
+st.set_page_config(
+    page_title="Plant Disease Detection",  # <-- This sets the browser tab title
+    page_icon="🌿",                        # <-- Optional: a small icon in the tab
+    layout="centered"                      # <-- Optional: page layout
+)
 st.title("🌱 Plant Disease Detection (YOLOv8)")
 
 uploaded_file = st.file_uploader("Upload a plant leaf image", type=["jpg", "jpeg", "png"])
