@@ -1,6 +1,8 @@
 import streamlit as st
 from ultralytics import YOLO
 from PIL import Image
+import cv2
+import os
 
 # Load YOLOv8 model only once
 @st.cache_resource
@@ -15,7 +17,8 @@ st.set_page_config(
     page_icon="🌿",                        # <-- Optional: a small icon in the tab
     layout="centered"                      # <-- Optional: page layout
 )
-st.title("🌱 Plant Disease Detection (YOLOv8)")
+st.markdown("<style>body, .stApp {background-color: #d4edda;}</style>", unsafe_allow_html=True)
+st.title("🌿  Plant Disease Detection  🌿")
 
 uploaded_file = st.file_uploader("Upload a plant leaf image", type=["jpg", "jpeg", "png"])
 
@@ -24,22 +27,28 @@ if uploaded_file is not None:
     st.image(image, caption="Uploaded Image", use_container_width=True)
 
     # Run prediction
-    results = model.predict(image, imgsz=320, conf=0.25, device="cpu")
+    results = model.predict(image, conf=0.1, iou=0.7, imgsz=320, device="cpu")
 
-    # Show annotated image
-    annotated = results[0].plot()  # numpy array (BGR)
-    st.image(annotated, caption="Predictions", use_container_width=True)
+    # Show annotated image (convert BGR → RGB for Streamlit)
+    annotated = results[0].plot()
+    annotated_rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
+    st.image(annotated_rgb, caption="Predictions", use_container_width=True)
 
-    # Show detected classes
-    detections = []
+    # Find top detection (highest confidence)
+    top_detection = None
+    top_conf = 0.0
     for r in results:
         for box in r.boxes:
             cls_id = int(box.cls[0])
             label = model.names[cls_id]
             conf = float(box.conf[0])
-            detections.append(f"{label} ({conf:.2f})")
+            if conf > top_conf:
+                top_detection = (label, conf)
+                top_conf = conf
 
-    if detections:
-        st.subheader("Detections:")
-        for d in detections:
-            st.write("- " + d)
+    # Display top detection result
+    if top_detection:
+        label, conf = top_detection
+        st.success(f"✅ Highest confidence disease: **{label}** (confidence: {conf:.2f})")
+    else:
+        st.error("❌ No disease detected in the image.")
